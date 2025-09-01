@@ -1,7 +1,4 @@
-  import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
-import { existsSync } from "fs";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -11,23 +8,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Aucun fichier audio reçu" }, { status: 400 });
   }
 
+  // Transformer le fichier en buffer
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
 
-  const uploadDir = path.join(process.cwd(), "public", "uploads");
+  // Construire un formData pour envoyer vers ton backend Render
+  const backendForm = new FormData();
+  backendForm.append("audio", new Blob([buffer]), file.name);
 
-  if (!existsSync(uploadDir)) {
-    await mkdir(uploadDir, { recursive: true });
-  }
+  // Appeler ton backend Render
+  const response = await fetch("https://jose-verba.onrender.com/upload-audio", {
+    method: "POST",
+    body: backendForm,
+  });
 
-  const timestamp = Date.now();
-  const sanitizedName = file.name.replace(/\s+/g, "_");
-  const fileName = `${timestamp}-${sanitizedName}`;
-  const filePath = path.join(uploadDir, fileName);
-  console.log(filePath)
-  await writeFile(filePath, buffer);
+  const result = await response.json();
 
-  const downloadURL = `uploads/${fileName}`;
-
-  return NextResponse.json({ downloadURL });
+  return NextResponse.json(result);
 }

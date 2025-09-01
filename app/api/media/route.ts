@@ -1,81 +1,67 @@
-import { NextRequest, NextResponse } from 'next/server';
-import path from 'path';
-import { writeFile, mkdir } from 'fs/promises';
-import prisma from '@/lib/prisma';
-import { existsSync } from 'fs';
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { BACKEND_SERVER_URL } from "@/lib/constants"; // ajoute ton URL Render ici
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  // On récupère le FormData natif
-  const formData = await req.formData();
+  try {
+    const formData = await req.formData();
+    const name = formData.get("name") as string;
+    const description = formData.get("description") as string;
+    const numberSpeaker = Number(formData.get("numberSpeaker"));
 
-  const name = formData.get('name') as string;
-  const description = formData.get('description') as string;
-  const numberSpeaker = Number(formData.get('numberSpeaker'));
+    const audio = formData.get("audio") as File | null;
+    const video = formData.get("video") as File | null;
 
-  const uploadDir = path.join(process.cwd(), '/public/uploads');
+    let audioLink: string | null = null;
+    let videoLink: string | null = null;
+    let fileSize = 0;
 
-  if (!existsSync(uploadDir)) {
-    await mkdir(uploadDir, { recursive: true });
+    const backendForm = new FormData();
+
+    if (audio && audio.size > 0) {
+      backendForm.append("audio", audio, audio.name);
+      fileSize = audio.size;
+    }
+
+    if (video && video.size > 0) {
+      backendForm.append("video", video, video.name);
+      fileSize = video.size;
+    }
+
+    // Envoie directement les fichiers vers Render
+    const backendResponse = await fetch(`${BACKEND_SERVER_URL}/media`, {
+      method: "POST",
+      body: backendForm,
+    });
+
+    const backendData = await backendResponse.json();
+
+    // Tu peux stocker la référence dans Prisma si besoin
+    const media = await prisma.media.create({
+      data: {
+        name,
+        description,
+        audioLink: backendData.audioLink ?? null,
+        videoLink: backendData.videoLink ?? null,
+        fileSize: fileSize.toString(),
+        numberSpeaker,
+      },
+    });
+
+    return NextResponse.json(media);
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
-
-  let audioLink = null;
-  let videoLink = null;
-  let fileSize = 0;
-
-  // Vérifie s'il y a un fichier audio
-  const audio = formData.get('audio') as File | null;
-  const video = formData.get('video') as File | null;
-
-  if (audio && audio.size > 0) {
-    const bytes = await audio.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const fileName = `${Date.now()}_${audio.name}`;
-    const filePath = path.join(uploadDir, fileName);
-
-    await writeFile(filePath, buffer);
-
-    audioLink = `/uploads/${fileName}`;
-    fileSize = audio.size;
-  }
-
-  if (video && video.size > 0) {
-    const bytes = await video.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const fileName = `${Date.now()}_${video.name}`;
-    const filePath = path.join(uploadDir, fileName);
-
-    await writeFile(filePath, buffer);
-
-    videoLink = `/uploads/${fileName}`;
-    fileSize = video.size;
-  }
-
-  const media = await prisma.media.create({
-    data: {
-      name,
-      description,
-      audioLink,
-      videoLink,
-      fileSize: fileSize.toString(),
-      numberSpeaker,
-    },
-  });
-
-  return NextResponse.json(media);
 }
 
-export async function GET(req:NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const res = await prisma.media.findMany()
-    return NextResponse.json(res)
-
+    const res = await prisma.media.findMany();
+    return NextResponse.json(res);
   } catch (e) {
-    return NextResponse.json({
-      code: 404,
-      message: "Error occured"
-    })
+    return NextResponse.json({ code: 404, message: "Erreur" });
   }
-  
 }

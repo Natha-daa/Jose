@@ -164,9 +164,6 @@ importers:
       node-fetch:
         specifier: ^3.3.2
         version: 3.3.2
-      prisma:
-        specifier: ^6.12.0
-        version: 6.12.0(typescript@5.0.2)
       react:
         specifier: ^19
         version: 19.1.0

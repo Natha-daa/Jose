@@ -20,12 +20,13 @@ export async function POST(req: NextRequest) {
     backendForm.append("description", description);
     backendForm.append("numberSpeaker", numberSpeaker.toString());
 
+    // Mapper audio ou video vers le champ 'file' attendu par le backend
     if (audio && audio.size > 0) {
-      backendForm.append("audio", audio, audio.name);
-    }
-
-    if (video && video.size > 0) {
-      backendForm.append("video", video, video.name);
+      backendForm.append("file", audio, audio.name); // Remplace 'audio' par 'file'
+    } else if (video && video.size > 0) {
+      backendForm.append("file", video, video.name); // Remplace 'video' par 'file'
+    } else {
+      throw new Error("Aucun fichier audio ou vidéo fourni");
     }
 
     // Envoie directement vers l’API Render
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(backendData);
   } catch (err) {
     console.error("Erreur POST /media:", err);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json({ error: err.message || "Erreur serveur" }, { status: 500 });
   }
 }
 
